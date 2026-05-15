@@ -1,7 +1,7 @@
 # Codigo para escala de grices shadertoy
 
 
-'''
+```
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
     // Normalizar las coordenadas de la pantalla (de 0.0 a 1.0)
@@ -17,12 +17,11 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // Asignar el valor de gris a los canales RGB, manteniendo el alfa original
     fragColor = vec4(vec3(gray), texColor.a);
 }
-
-'''
+```
 
 # kernel de CUDA
 
-'''
+```C++
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 
@@ -59,10 +58,10 @@ __global__ void grayscaleKernel(const Pixel* d_input, Pixel* d_output, int width
         d_output[idx].a = p.a;
     }
 }
-'''
+```
 
 # Función host: configura y lanza el kernel
-'''
+```C++
 #include <iostream>
 
 void processGrayscale(const Pixel* h_inputImage, Pixel* h_outputImage, int width, int height)
@@ -103,7 +102,7 @@ void processGrayscale(const Pixel* h_inputImage, Pixel* h_outputImage, int width
     cudaFree(d_input);
     cudaFree(d_output);
 }
-'''
+```
 
 ## mainImage --> kernel
 En Shadertoy, mainImage es el punto de entrada que el hardware gráfico invoca automáticamente para cada píxel de la pantalla de forma paralela.
@@ -114,27 +113,27 @@ En CUDA, el equivalente es una función tipo Kernel, la cual se define con el ca
 En Shadertoy, fragCoord contiene las coordenadas de píxel de la pantalla (por ejemplo, desde (0.5, 0.5) hasta (1919.5, 1079.5)). La GPU gestiona esto internamente.
 
 En CUDA no existe una variable precalculada con la posición del píxel. La GPU te proporciona la posición del hilo actual dentro de una estructura de ejecución jerárquica (bloques y rejillas). Tienes que calcular la coordenada matemática manualmente combinando estas variables nativas:
-'''
+```C++
 int x = blockIdx.x * blockDim.x + threadIdx.x; // Coordenada X del píxel
 int y = blockIdx.y * blockDim.y + threadIdx.y; // Coordenada Y del píxel
-'''
+```
 
 ## iChannel0, iChannel1 --> Punteros de memoria lineal (const Pixel* d_input)
 En Shadertoy, los canales son abstracciones de texturas (imágenes, videos o audio) gestionadas por la API gráfica de WebGL. Para acceder a ellos, usas la función incorporada texture(iChannel0, uv), la cual lee la textura utilizando coordenadas normalizadas de 0.0 a 1.0 e interpola los datos por hardware.
 
 En CUDA estándar, no hay abstracción de texturas por defecto (aunque existen los Texture Objects basados en hardware, lo común en cómputo general es usar arreglos planos). Pasas los datos como un puntero a un bloque de memoria lineal en la VRAM asignado previamente con cudaMalloc. Para acceder a los datos, calculas el índice unidimensional plano:
-'''
+```C++
 int idx = y * ancho + x; // Mapeo bidimensional a unidimensional
 Pixel color = d_input[idx]; // Lectura directa de memoria
-'''
+```
 
 ## fraColor --> Escritura en el búfer de salida (d_output[idx] = ...)
 En Shadertoy, fragColor es un parámetro de salida de tipo vec4 (RGBA con valores flotantes entre 0.0 y 1.0). El valor que asignes a esta variable se escribe automáticamente en el Frame Buffer para ser mostrado en pantalla.
 
 En CUDA, no estás obligado a escribir en la pantalla ni a usar cuatro canales flotantes. El equivalente es simplemente escribir el resultado en un arreglo de salida en la memoria de la GPU utilizando el mismo índice lineal calculado. Los datos suelen guardarse en enteros de 8 bits (unsigned char de 0 a 255) para optimizar memoria si el objetivo es procesar una imagen estándar.
-'''
+```C++
 d_output[idx].r = r;
 d_output[idx].g = g;
 d_output[idx].b = b;
 d_output[idx].a = a;
-'''
+```
